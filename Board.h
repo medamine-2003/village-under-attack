@@ -1,28 +1,30 @@
-#ifndef BOARD_H
-#define BOARD_H
+#pragma once
 #include <vector>
-#include "Buildings/Building.h"
-#include "Entities/Entity.h"
+#include <memory>
+#include <chrono>
+#include "Position.h"
+#include "buildings/building.h"
 #include "Entities/Player.h"
-#include "Entities/Enemies/Raider.h"
+#include "Entities/Enemies/Enemy.h"
 
 class Board {
-private:
-    int sizeX;
-    int sizeY;
-    std::vector<Building*> buildings;
-    std::vector<Entity*> entities;
+    std::vector<std::unique_ptr<Building>> buildings;
+    std::vector<std::unique_ptr<Enemy>> enemies;
+    Player player;
+    int width;
+    int height;
+    std::chrono::time_point<std::chrono::system_clock> lastEnemySpawn;
 
 public:
-    Board(int sizeX = 20, int sizeY = 20);
-    ~Board();
-    bool placeBuilding(Building* building, const Resources& resources);
-    void placeEntity(Entity* entity);
-    void moveEntity(Entity* entity, int dx, int dy);
-    void render() const;
-    Building* findNearestBuilding(Position pos) const;
-    std::vector<Building*>& getBuildings();  // Ensure this declaration is present
-    std::vector<Entity*>& getEntities();     // Ensure this declaration is present
-};
+    Board(int w, int h);
 
-#endif
+    void update();
+    bool addBuilding(std::unique_ptr<Building> building);
+    Building* getBuildingAt(const Position& pos) const;
+    void spawnEnemy();
+
+    Player& getPlayer() const;
+    const std::vector<std::unique_ptr<Building>>& getBuildings() const;
+    const std::vector<std::unique_ptr<Enemy>>& getEnemies() const;
+    bool isTownHallDestroyed() const;
+};
