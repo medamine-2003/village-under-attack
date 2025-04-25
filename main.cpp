@@ -1,109 +1,194 @@
+
 #include "Board.h"
-#include "Buildings/TownHall.h"  // Fixed path
-#include "Buildings/GoldMine.h"
-#include "Buildings/ElixirCollector.h"
-#include "Buildings/Wall.h"
-#include "Entities/Player.h"
-#include "Entities/Enemies/Raider.h"
+#include "buildings/TownHall.h"
+#include "buildings/GoldMine.h"
+#include "buildings/ElixirCollector.h"
+#include "buildings/Wall.h"
 #include <iostream>
-#include <cstdlib>
-#include <ctime>
+#include <iomanip>
+#include <termios.h>
+#include <unistd.h>
+#include <fcntl.h>
 
-int main() {
-    srand(time(0));
-    Board board;
+bool kbhit() {
+    struct termios oldt, newt;
+    int ch;
+    int oldf;
+    
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
+    fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
+    
+    ch = getchar();
+    
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    fcntl(STDIN_FILENO, F_SETFL, oldf);
+    
+    if(ch != EOF) {
+        ungetc(ch, stdin);
+        return true;
+    }
+    return false;
+}
 
-    Player* player = new Player(Position(10, 10));
-    board.placeEntity(player);
-    board.placeBuilding(new TownHall(Position(8, 8)), player->getResources());
+int getch() {
+    int ch;
+    struct termios oldt, newt;
+    
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    
+    ch = getchar();
+    
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    return ch;
+}
 
-    bool running = true;
-    int enemySpawnTimer = 0;
-    while (running) {
-        board.render();
-        std::cout << "Move (arrows: w/a/s/d), Build (G/E/W), Collect (C), Quit (Q): ";
+void clearScreen() {
+    std::cout << "\033[2J\033[1;1H";
+}
 
-        char input;
-        std::cin >> input;
+void render(const Board& board) {
+    clearScreen();
 
-        switch (tolower(input)) {
-            case 'w': board.moveEntity(player, 0, -1); break;
-            case 's': board.moveEntity(player, 0, 1); break;
-            case 'a': board.moveEntity(player, -1, 0); break;
-            case 'd': board.moveEntity(player, 1, 0); break;
-            case 'g': {
-                GoldMine* mine = new GoldMine(player->getPosition());
-                if (board.placeBuilding(mine, player->getResources())) {
-                    player->getResources().consumeElixir(100);
-                } else {
-                    delete mine;
-                }
-                break;
-            }
-            case 'e': {
-                ElixirCollector* collector = new ElixirCollector(player->getPosition());
-                if (board.placeBuilding(collector, player->getResources())) {
-                    player->getResources().consumeGold(100);
-                } else {
-                    delete collector;
-                }
-                break;
-            }
-            case 'v': {
-                Wall* wall = new Wall(player->getPosition());
-                if (board.placeBuilding(wall, player->getResources())) {
-                    player->getResources().consumeGold(10);
-                } else {
-                    delete wall;
-                }
-                break;
-            }
-            case 'c': {
-                for (Building* b : board.getBuildings()) {
-                    ResourceGenerator* rg = dynamic_cast<ResourceGenerator*>(b);
-                    if (rg && rg->getPosition() == player->getPosition()) {
-                        player->collectResources(rg);
-                    }
-                }
-                break;
-            }
-            case 'q': running = false; break;
-        }
-
-        for (Building* b : board.getBuildings()) {
-            ResourceGenerator* rg = dynamic_cast<ResourceGenerator*>(b);
-            if (rg) rg->generate();
-        }
-
-        if (++enemySpawnTimer >= 50) {
-            board.placeEntity(new Raider(Position(rand() % 20, rand() % 20)));
-            enemySpawnTimer = 0;
-        }
-
-        for (Entity* e : board.getEntities()) {
-            Raider* raider = dynamic_cast<Raider*>(e);
-            if (raider) {
-                Building* target = board.findNearestBuilding(raider->getPosition());
-                if (target) {
-                    Position tp = target->getPosition();
-                    Position ep = raider->getPosition();
-                    int dx = (tp.x > ep.x) ? 1 : (tp.x < ep.x) ? -1 : 0;
-                    int dy = (tp.y > ep.y) ? 1 : (tp.y < ep.y) ? -1 : 0;
-                    board.moveEntity(raider, dx, dy);
-                    if (raider->getPosition() == target->getPosition()) {
-                        target->takeDamage(10);
-                    }
-                }
-            }
-        }
-
-        for (Building* b : board.getBuildings()) {
-            if (dynamic_cast<TownHall*>(b) && b->getHealth() <= 0) {
-                std::cout << "TownHall destroyed! Game Over!" << std::endl;
-                running = false;
-            }
-        }
+    // Simple grid rendering
+    for (int y = 0; y < board.getPlayer().getPosition().y - 5; y++) {
+        std::cout << std::endl;
     }
 
+    for (int y = 0; y < 10; y++) {
+        for (int x = 0; x < 20; x++) {
+            Position pos(x + board.getPlayer().getPosition().x - 10, 
+                         y + board.getPlayer().getPosition().y - 5);
+
+            bool rendered = false;
+
+            // Render player
+            if (pos == board.getPlayer().getPosition()) {
+                std::cout << board.getPlayer().getRepr();
+                rendered = true;
+            }
+
+            // Render buildings
+            if (!rendered) {
+                for (const auto& building : board.getBuildings()) {
+                    if (building->isColliding(pos)) {
+                        std::cout << building->getRepr();
+                        rendered = true;
+                        break;
+                    }
+                }
+            }
+
+            // Render enemies
+            if (!rendered) {
+                for (const auto& enemy : board.getEnemies()) {
+                    if (enemy->getPosition() == pos) {
+                        std::cout << enemy->getRepr();
+                        rendered = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!rendered) {
+                std::cout << "·";
+            }
+        }
+        std::cout << std::endl;
+    }
+
+    // Display resources
+    std::cout << "\n╔════════════════ Resources ════════════════╗";
+    std::cout << "\n║ Gold: " << std::setw(5) << board.getPlayer().getResources().getGold();
+    std::cout << "  Elixir: " << std::setw(5) << board.getPlayer().getResources().getElixir();
+    std::cout << "  TH Health: ";
+    
+    for (const auto& building : board.getBuildings()) {
+        if (dynamic_cast<TownHall*>(building.get())) {
+            std::cout << std::setw(3) << building->getHealth() << " ║";
+            break;
+        }
+    }
+    
+    std::cout << "\n╠════════════════ Controls ══════════════════╣";
+    std::cout << "\n║ Movement:  ↑ = Up    ↓ = Down             ║";
+    std::cout << "\n║           ← = Left   → = Right            ║";
+    std::cout << "\n╠═════════════ Building Controls ═══════════╣";
+    std::cout << "\n║ G = Build Gold Mine (Cost: 100 Elixir)    ║";
+    std::cout << "\n║ E = Build Elixir Collector (Cost: 100 Gold)║";
+    std::cout << "\n║ W = Build Wall (Cost: 10 Gold)            ║";
+    std::cout << "\n║ C = Collect Resources                      ║";
+    std::cout << "\n╚═════════════════════════════════════════════╝";
+}
+
+int main() {
+    Board board(40, 40);
+
+    while (!board.isTownHallDestroyed()) {
+        // Handle input
+        if (kbhit()) {
+            char ch = getch();
+            
+            switch (ch) {
+                case 27: // ESC
+                    break;
+                case 'A': // Up Arrow
+                    board.getPlayer().move(0, -1); 
+                    break;
+                case 'B': // Down Arrow
+                    board.getPlayer().move(0, 1);
+                    break;
+                case 'D': // Left Arrow
+                    board.getPlayer().move(-1, 0);
+                    break;
+                case 'C': // Right Arrow
+                    board.getPlayer().move(1, 0);
+                    break;
+                default:
+                    switch (toupper(ch)) {
+                        case 'G': {
+                            auto pos = board.getPlayer().getPosition();
+                            if (board.getPlayer().build('G', pos.x, pos.y)) {
+                                board.addBuilding(std::make_unique<GoldMine>(pos.x, pos.y));
+                            }
+                            break;
+                        }
+                        case 'E': {
+                            auto pos = board.getPlayer().getPosition();
+                            if (board.getPlayer().build('E', pos.x, pos.y)) {
+                                board.addBuilding(std::make_unique<ElixirCollector>(pos.x, pos.y));
+                            }
+                            break;
+                        }
+                        case 'W': {
+                            auto pos = board.getPlayer().getPosition();
+                            if (board.getPlayer().build('W', pos.x, pos.y)) {
+                                board.addBuilding(std::make_unique<Wall>(pos.x, pos.y));
+                            }
+                            break;
+                        }
+                        case 'C': {
+                            auto building = board.getBuildingAt(board.getPlayer().getPosition());
+                            if (building) {
+                                board.getPlayer().collectFrom(building);
+                            }
+                            break;
+                        }
+                    }
+            }
+        }
+
+        board.update();
+        render(board);
+        usleep(100000); // 100ms delay
+    }
+
+    std::cout << "\nGame Over! Town Hall destroyed!\n";
     return 0;
 }
