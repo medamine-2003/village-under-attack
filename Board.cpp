@@ -1,100 +1,94 @@
 #include "Board.h"
-#include <iostream>
+#include "buildings/TownHall.h"
+#include "Entities/Enemies/Raider.h"
 #include <algorithm>
-#include <cmath>
-#include "Buildings/ResourceGenerator.h"
-#include "Buildings/GoldMine.h"
-#include "Buildings/ElixirCollector.h"
+#include <random>
 
-Board::Board(int sizeX, int sizeY) : sizeX(sizeX), sizeY(sizeY) {}
-
-Board::~Board() {
-    for (Building* b : buildings) delete b;
-    for (Entity* e : entities) delete e;
+Board::Board(int w, int h) 
+    : player(w/2, h/2), width(w), height(h) {
+    // Add initial TownHall
+    buildings.push_back(std::make_unique<TownHall>(width/2, height/2));
+    lastEnemySpawn = std::chrono::system_clock::now();
 }
 
-bool Board::placeBuilding(Building* building, const Resources& resources) {
-    if (building->canPlace(resources)) {
-        buildings.push_back(building);
-        return true;
+void Board::update() {
+    // Update all buildings
+    for (auto& building : buildings) {
+        building->update();
     }
-    return false;
-}
 
-void Board::placeEntity(Entity* entity) {
-    entities.push_back(entity);
-}
-
-void Board::moveEntity(Entity* entity, int dx, int dy) {
-    entity->move(dx, dy);
-    Position pos = entity->getPosition();
-    pos.x = std::max(0, std::min(pos.x, sizeX - 1));
-    pos.y = std::max(0, std::min(pos.y, sizeY - 1));
-}
-
-Building* Board::findNearestBuilding(Position pos) const {
-    Building* nearest = nullptr;
-    double minDist = std::numeric_limits<double>::max();
-    for (Building* b : buildings) {
-        Position bp = b->getPosition();
-        double dist = std::sqrt(std::pow(bp.x - pos.x, 2) + std::pow(bp.y - pos.y, 2));
-        if (dist < minDist) {
-            minDist = dist;
-            nearest = b;
-        }
+    // Update all enemies
+    for (auto& enemy : enemies) {
+        enemy->update();
     }
-    return nearest;
+
+    // Spawn enemies periodically
+    auto now = std::chrono::system_clock::now();
+    if (std::chrono::duration_cast<std::chrono::seconds>(now - lastEnemySpawn).count() > 30) {
+        spawnEnemy();
+        lastEnemySpawn = now;
+    }
+
+    // Remove destroyed buildings
+    buildings.erase(
+        std::remove_if(buildings.begin(), buildings.end(),
+            [](const std::unique_ptr<Building>& b) { return b->isDestroyed(); }),
+        buildings.end());
+
+    // Remove destroyed enemies
+    enemies.erase(
+        std::remove_if(enemies.begin(), enemies.end(),
+            [](const std::unique_ptr<Enemy>& e) { return e->isDestroyed(); }),
+        enemies.end());
 }
 
-std::vector<Building*>& Board::getBuildings() {
-    return buildings;
-}
-
-std::vector<Entity*>& Board::getEntities() {
-    return entities;
-}
-
-void Board::render() const {
-    std::vector<std::vector<std::string>> grid(sizeY, std::vector<std::string>(sizeX, "."));
-
-    for (Building* b : buildings) {
-        Position pos = b->getPosition();
-        std::string repr = b->getRepr();
-        ResourceGenerator* rg = dynamic_cast<ResourceGenerator*>(b);
-        if (rg && rg->isFullGenerator()) {
-            if (dynamic_cast<GoldMine*>(b)) repr = "🪙"; // Emoji 🪙
-            else if (dynamic_cast<ElixirCollector*>(b)) repr = "🧴"; // Emoji 🧴
-        }
-        for (int y = pos.y; y < pos.y + b->getSizeY() && y < sizeY; ++y) {
-            for (int x = pos.x; x < pos.x + b->getSizeX() && x < sizeX; ++x) {
-                grid[y][x] = repr;
-            }
+bool Board::addBuilding(std::unique_ptr<Building> building) {
+    // Check if position is available
+    for (const auto& existing : buildings) {
+        if (existing->isColliding(building->getPosition())) {
+            return false;
         }
     }
 
-    for (Entity* e : entities) {
-        Position pos = e->getPosition();
-        if (pos.x >= 0 && pos.x < sizeX && pos.y >= 0 && pos.y < sizeY) {
-            grid[pos.y][pos.x] = e->getRepr();
-        }
-    }
+    buildings.push_back(std::move(building));
+    return true;
+}
 
-    for (const auto& row : grid) {
-        for (const auto& cell : row) {
-            std::cout << cell << " ";
+Building* Board::getBuildingAt(const Position& pos) const {
+    for (const auto& building : buildings) {
+        if (building->isColliding(pos)) {
+            return building.get();
         }
-        std::cout << std::endl;
     }
+    return nullptr;
+}
 
-    Player* player = nullptr;
-    for (Entity* e : entities) {
-        if (dynamic_cast<Player*>(e)) {
-            player = dynamic_cast<Player*>(e);
-            break;
+void Board::spawnEnemy() {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dist(0, width-1);
+
+    int x = dist(gen);
+    int y = (dist(gen) % 2 == 0) ? 0 : height-1;
+
+    auto enemy = std::make_unique<Raider>(x, y);
+    std::vector<Building*> buildingPtrs;
+    for (const auto& b : buildings) {
+        buildingPtrs.push_back(b.get());
+    }
+    enemy->findTarget(buildingPtrs);
+    enemies.push_back(std::move(enemy));
+}
+
+Player& Board::getPlayer() const { return const_cast<Player&>(player); }
+const std::vector<std::unique_ptr<Building>>& Board::getBuildings() const { return buildings; }
+const std::vector<std::unique_ptr<Enemy>>& Board::getEnemies() const { return enemies; }
+
+bool Board::isTownHallDestroyed() const {
+    for (const auto& building : buildings) {
+        if (dynamic_cast<TownHall*>(building.get())) {
+            return building->isDestroyed();
         }
     }
-    if (player) {
-        std::cout << "Gold: " << player->getResources().gold
-                  << " Elixir: " << player->getResources().elixir << std::endl;
-    }
+    return true;
 }
