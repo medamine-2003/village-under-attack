@@ -1,5 +1,4 @@
-#ifndef ENTITY_H
-#define ENTITY_H
+#pragma once
 #include "../Position.h"
 #include <string>
 
@@ -7,17 +6,17 @@ class Entity {
 protected:
     Position position;
     std::string repr;
+    int health;
 
 public:
-    Entity(Position pos, std::string repr);
+    Entity(int x, int y, const std::string& r, int h);
     virtual ~Entity() = default;
 
-    // Getters
+    virtual void update() = 0;
+    void takeDamage(int amount);
+    bool isDestroyed() const;
+
     Position getPosition() const;
     std::string getRepr() const;
-
-    // Methods
-    virtual void move(int dx, int dy);
+    int getHealth() const;
 };
-
-#endif
