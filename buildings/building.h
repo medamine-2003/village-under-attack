@@ -1,34 +1,32 @@
-#ifndef BUILDING_H
-#define BUILDING_H
+#pragma once
 #include "../Position.h"
-#include "../Resources.h"
 #include <string>
+#include <memory>
 
 class Building {
 protected:
+    Position position;
     int sizeX;
     int sizeY;
     std::string repr;
-    int costGold;
-    int costElixir;
+    int cost;
     int maxInstances;
-    Position position;
     int health;
 
 public:
-    Building(int sizeX, int sizeY, std::string repr, int costGold, int costElixir, int maxInstances, Position pos, int health);
+    Building(int x, int y, const std::string& r, int sx, int sy, int c, int max);
     virtual ~Building() = default;
 
-    // Getters
+    bool isColliding(const Position& pos) const;
+    virtual void update() = 0;
+    void takeDamage(int amount);
+    bool isDestroyed() const;
+
+    Position getPosition() const;
     int getSizeX() const;
     int getSizeY() const;
     std::string getRepr() const;
-    Position getPosition() const;
+    int getCost() const;
+    int getMaxInstances() const;
     int getHealth() const;
-
-    // Methods
-    virtual bool canPlace(const Resources& resources) const;
-    virtual void takeDamage(int damage);
 };
-
-#endif
