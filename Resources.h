@@ -1,16 +1,16 @@
-#ifndef RESOURCES_H
-#define RESOURCES_H
+#pragma once
 
 class Resources {
-public:
     int gold;
     int elixir;
 
-    Resources(int gold = 400, int elixir = 400); // Initial values from spec (page 11)
-    void addGold(int amount);
-    void addElixir(int amount);
-    bool consumeGold(int amount);
-    bool consumeElixir(int amount);
-};
+public:
+    Resources(int g = 0, int e = 0);
 
-#endif
+    bool canAfford(int g, int e) const;
+    void add(int g, int e);
+    void spend(int g, int e);
+
+    int getGold() const;
+    int getElixir() const;
+};
