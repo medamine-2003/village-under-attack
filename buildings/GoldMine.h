@@ -1,10 +1,8 @@
-#ifndef GOLDMINE_H
-#define GOLDMINE_H
+#pragma once
 #include "ResourceGenerator.h"
 
 class GoldMine : public ResourceGenerator {
 public:
-    GoldMine(Position pos);
+    GoldMine(int x, int y);
+    int collect() override;
 };
-
-#endif
