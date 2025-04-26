@@ -1,11 +1,8 @@
-#ifndef ELIXIRCOLLECTOR_H
-#define ELIXIRCOLLECTOR_H
+#pragma once
 #include "ResourceGenerator.h"
 
 class ElixirCollector : public ResourceGenerator {
 public:
-    ElixirCollector(Position pos);
-     bool collect(Resources& resources) override;
+    ElixirCollector(int x, int y);
+    int collect() override;
 };
-
-#endif
