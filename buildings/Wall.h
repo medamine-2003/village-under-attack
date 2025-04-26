@@ -1,10 +1,8 @@
-#ifndef WALL_H
-#define WALL_H
-#include "Building.h"
+#pragma once
+#include "building.h"
 
 class Wall : public Building {
 public:
-    Wall(Position pos);
+    Wall(int x, int y);
+    void update() override;
 };
-
-#endif
