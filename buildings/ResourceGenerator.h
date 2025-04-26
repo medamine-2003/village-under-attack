@@ -1,18 +1,15 @@
-#ifndef RESOURCEGENERATOR_H
-#define RESOURCEGENERATOR_H
-#include "Building.h"
+#pragma once
+#include "building.h"
 
 class ResourceGenerator : public Building {
 protected:
     int current;
-    int capacity;
-    bool isFull;
+    const int capacity = 100;
 
 public:
-    ResourceGenerator(int sizeX, int sizeY, std::string repr, int costGold, int costElixir, int maxInstances, Position pos, int health);
-    virtual void generate(); // Generate resources over time
-    virtual bool collect(Resources& resources); // Collect resources
-    bool isFullGenerator() const;
-};
+    ResourceGenerator(int x, int y, const std::string& r, int sx, int sy, int c, int max);
 
-#endif
+    bool isFull() const;
+    virtual int collect() = 0;
+    void update() override;
+};
