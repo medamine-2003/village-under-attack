@@ -1,10 +1,8 @@
-#ifndef TOWNHALL_H
-#define TOWNHALL_H
-#include "Building.h"
+#pragma once
+#include "building.h"
 
 class TownHall : public Building {
 public:
-    TownHall(Position pos);
+    TownHall(int x, int y);
+    void update() override;
 };
-
-#endif
