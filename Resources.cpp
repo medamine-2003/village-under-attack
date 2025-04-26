@@ -1,27 +1,20 @@
 #include "Resources.h"
 
-Resources::Resources(int gold, int elixir) : gold(gold), elixir(elixir) {}
+Resources::Resources(int g, int e) : gold(g), elixir(e) {}
 
-void Resources::addGold(int amount) {
-    if (amount > 0) gold += amount;
+bool Resources::canAfford(int g, int e) const {
+    return gold >= g && elixir >= e;
 }
 
-void Resources::addElixir(int amount) {
-    if (amount > 0) elixir += amount;
+void Resources::add(int g, int e) {
+    gold += g;
+    elixir += e;
 }
 
-bool Resources::consumeGold(int amount) {
-    if (amount >= 0 && gold >= amount) {
-        gold -= amount;
-        return true;
-    }
-    return false;
+void Resources::spend(int g, int e) {
+    gold -= g;
+    elixir -= e;
 }
 
-bool Resources::consumeElixir(int amount) {
-    if (amount >= 0 && elixir >= amount) {
-        elixir -= amount;
-        return true;
-    }
-    return false;
-}
+int Resources::getGold() const { return gold; }
+int Resources::getElixir() const { return elixir; }
